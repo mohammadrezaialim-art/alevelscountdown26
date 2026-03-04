@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Countdown</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a08;
+      --ink: #f0ece0;
+      --accent: #d4ff00;
+      --muted: #3a3a30;
+      --border: #2a2a22;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'DM Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Grain overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.06'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 100;
+      opacity: 0.4;
+    }
+
+    /* Subtle grid */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 80px 80px;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.4;
+    }
+
+    .container {
+      position: relative;
+      z-index: 10;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .label-top {
+      font-size: 0.7rem;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 2.5rem;
+      opacity: 0;
+      animation: fadeUp 0.8s ease forwards 0.2s;
+    }
+
+    .date-target {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(1.8rem, 5vw, 3.2rem);
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 3rem;
+      opacity: 0;
+      animation: fadeUp 0.8s ease forwards 0.4s;
+    }
+
+    .date-target span {
+      color: var(--ink);
+    }
+
+    .timer {
+      display: flex;
+      gap: clamp(1rem, 4vw, 3rem);
+      align-items: flex-end;
+      justify-content: center;
+      margin-bottom: 3rem;
+    }
+
+    .unit {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      opacity: 0;
+      animation: fadeUp 0.8s ease forwards;
+    }
+
+    .unit:nth-child(1) { animation-delay: 0.5s; }
+    .unit:nth-child(2) { animation-delay: 0.65s; }
+    .unit:nth-child(3) { animation-delay: 0.8s; }
+    .unit:nth-child(4) { animation-delay: 0.95s; }
+
+    .digits {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(4rem, 16vw, 11rem);
+      line-height: 1;
+      color: var(--ink);
+      position: relative;
+      min-width: 2ch;
+      transition: transform 0.1s ease;
+    }
+
+    .digits.tick {
+      animation: tick 0.15s ease;
+    }
+
+    .unit-label {
+      font-size: 0.85rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--ink);
+      margin-top: 0.75rem;
+      font-weight: 400;
+      opacity: 0.75;
+    }
+
+    .sep {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(3rem, 10vw, 7rem);
+      color: var(--muted);
+      padding-bottom: 0.8rem;
+      opacity: 0;
+      animation: fadeUp 0.8s ease forwards 0.6s;
+      user-select: none;
+    }
+
+    .progress-wrap {
+      width: min(500px, 80vw);
+      height: 2px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 0 auto 2rem;
+      overflow: hidden;
+      opacity: 0;
+      animation: fadeUp 0.8s ease forwards 1.1s;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width 1s linear;
+      box-shadow: 0 0 12px var(--accent);
+    }
+
+    .footer-note {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      text-transform: uppercase;
+      opacity: 0;
+      animation: fadeUp 0.8s ease forwards 1.3s;
+    }
+
+    .expired-msg {
+      display: none;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(3rem, 10vw, 7rem);
+      color: var(--accent);
+      letter-spacing: 0.1em;
+      text-shadow: 0 0 40px var(--accent);
+      animation: pulse 2s ease infinite;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes tick {
+      0%   { transform: scaleY(1); }
+      50%  { transform: scaleY(0.92); color: var(--accent); }
+      100% { transform: scaleY(1); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.6; }
+    }
+
+    /* Accent corner lines */
+    .corner {
+      position: fixed;
+      width: 40px;
+      height: 40px;
+      z-index: 10;
+      opacity: 0.4;
+    }
+    .corner-tl { top: 24px; left: 24px; border-top: 1px solid var(--accent); border-left: 1px solid var(--accent); }
+    .corner-tr { top: 24px; right: 24px; border-top: 1px solid var(--accent); border-right: 1px solid var(--accent); }
+    .corner-bl { bottom: 24px; left: 24px; border-bottom: 1px solid var(--accent); border-left: 1px solid var(--accent); }
+    .corner-br { bottom: 24px; right: 24px; border-bottom: 1px solid var(--accent); border-right: 1px solid var(--accent); }
+  </style>
+</head>
+<body>
+
+  <div class="corner corner-tl"></div>
+  <div class="corner corner-tr"></div>
+  <div class="corner corner-bl"></div>
+  <div class="corner corner-br"></div>
+
+  <div class="container">
+    <div class="label-top">Countdown to</div>
+    <div class="date-target"><span>5 March 2026</span> — 13:00</div>
+
+    <div id="timer" class="timer">
+      <div class="unit" id="unit-d">
+        <div class="digits" id="days">00</div>
+        <div class="unit-label">Days</div>
+      </div>
+      <div class="sep">:</div>
+      <div class="unit" id="unit-h">
+        <div class="digits" id="hours">00</div>
+        <div class="unit-label">Hours</div>
+      </div>
+      <div class="sep">:</div>
+      <div class="unit" id="unit-m">
+        <div class="digits" id="minutes">00</div>
+        <div class="unit-label">Minutes</div>
+      </div>
+      <div class="sep">:</div>
+      <div class="unit" id="unit-s">
+        <div class="digits" id="seconds">00</div>
+        <div class="unit-label">Seconds</div>
+      </div>
+    </div>
+
+    <div class="expired-msg" id="expired">Time's Up</div>
+
+    <div class="progress-wrap">
+      <div class="progress-bar" id="progress" style="width:0%"></div>
+    </div>
+
+    <div class="footer-note" id="footer-note">— T minus counting —</div>
+  </div>
+
+  <script>
+    const TARGET = new Date('2026-03-05T13:00:00').getTime();
+    // Reference start: now at page load, capped to reasonable past
+    const START = Math.min(Date.now(), TARGET);
+
+    const pad = n => String(Math.max(0, n)).padStart(2, '0');
+
+    const elDays    = document.getElementById('days');
+    const elHours   = document.getElementById('hours');
+    const elMinutes = document.getElementById('minutes');
+    const elSeconds = document.getElementById('seconds');
+    const elExpired = document.getElementById('expired');
+    const elTimer   = document.getElementById('timer');
+    const elProgress = document.getElementById('progress');
+    const elFooter  = document.getElementById('footer-note');
+
+    let prevSec = -1;
+
+    function animateTick(el) {
+      el.classList.remove('tick');
+      void el.offsetWidth;
+      el.classList.add('tick');
+    }
+
+    function update() {
+      const now  = Date.now();
+      const diff = TARGET - now;
+
+      if (diff <= 0) {
+        elTimer.style.display = 'none';
+        elExpired.style.display = 'block';
+        elProgress.style.width = '100%';
+        elFooter.textContent = '— event reached —';
+        return;
+      }
+
+      const totalSecs = Math.floor(diff / 1000);
+      const d = Math.floor(totalSecs / 86400);
+      const h = Math.floor((totalSecs % 86400) / 3600);
+      const m = Math.floor((totalSecs % 3600) / 60);
+      const s = totalSecs % 60;
+
+      if (s !== prevSec) {
+        animateTick(elSeconds);
+        prevSec = s;
+        if (s === 59) animateTick(elMinutes);
+        if (s === 59 && m === 59) animateTick(elHours);
+      }
+
+      elDays.textContent    = pad(d);
+      elHours.textContent   = pad(h);
+      elMinutes.textContent = pad(m);
+      elSeconds.textContent = pad(s);
+
+      // Progress bar based on elapsed from START to TARGET
+      const totalDuration = TARGET - START;
+      const elapsed = now - START;
+      const pct = Math.min(100, (elapsed / totalDuration) * 100);
+      elProgress.style.width = pct + '%';
+
+      requestAnimationFrame(update);
+    }
+
+    update();
+  </script>
+</body>
+</html>
